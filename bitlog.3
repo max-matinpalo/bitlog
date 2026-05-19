@@ -1,0 +1,119 @@
+.TH BITLOG 3 "May 2026" "C99 Bitlog Library" "Linux Programmer's Manual"
+.SH NAME
+bitlog \- ultra-lightweight, fixed-size bit array tracking system
+.SH SYNOPSIS
+.B #include "bitlog.h"
+.HP
+.B typedef struct { ... } bitlog_t;
+.HP
+.BI "int bitlog_word_count_for_bits(uint64_t " bits ");"
+.HP
+.BI "int bitlog_is_empty(const bitlog_t *" log ");"
+.HP
+.BI "int bitlog_init(bitlog_t *" log ", uint64_t *" buffer ", int " word_count ");"
+.HP
+.BI "int bitlog_test(const bitlog_t *" log ", uint64_t " index ");"
+.HP
+.BI "void bitlog_set(bitlog_t *" log ", uint64_t " index ");"
+.HP
+.BI "void bitlog_clear(bitlog_t *" log ", uint64_t " index ");"
+.HP
+.BI "int bitlog_pop_lowest(bitlog_t *" log ");"
+.HP
+.BI "int bitlog_pop_highest(bitlog_t *" log ");"
+.HP
+.BI "uint64_t bitlog_get_used_count(const bitlog_t *" log ");"
+.HP
+.BI "void bitlog_clear_all(bitlog_t *" log ");"
+.SH DESCRIPTION
+.B bitlog
+is a single-header, zero-allocation C99 utility designed to manage a compact 
+bit array backed by a user-provided buffer of 64-bit words. It provides 
+constant-time metadata tracking, including population counts and active slot 
+boundaries, allowing aggressive compiler optimizations and fast bit manipulation.
+.PP
+The internal tracking structures minimize scanning overhead during prioritized 
+extractions, making it highly suitable for high-performance scheduling, tracking, 
+or event logs.
+.SH FUNCTIONS
+.TP
+.BI bitlog_word_count_for_bits( bits )
+Calculates the number of 64-bit words required to safely hold the specified number 
+of 
+.I bits
+without integer overflow. Returns the word count, or -1 if the result would 
+overflow an integer.
+.TP
+.BI bitlog_is_empty( log )
+Returns a non-zero value if the bit log contains no set bits, and 0 otherwise. 
+Executes in
+.I O(1)
+time.
+.TP
+.BI bitlog_init( log ", " buffer ", " word_count )
+Initializes the 
+.I bitlog_t
+structure to manage the provided memory 
+.I buffer
+consisting of
+.I word_count
+elements. It scans existing data to accurately construct internal tracking hints and 
+population counts. Returns 0 on success, or -1 if inputs are invalid.
+.TP
+.BI bitlog_test( log ", " index )
+Tests the bit at the specified
+.I index\fR.
+Aborts via 
+.BR assert (3)
+if the index maps out of bounds. Returns non-zero if the bit is set, and 0 otherwise.
+.TP
+.BI bitlog_set( log ", " index )
+Sets the bit at the specified
+.I index
+to 1. Tracks internal boundary changes and increments the total population count if 
+the bit was not previously set. Bounds are enforced via
+.BR assert (3).
+.TP
+.BI bitlog_clear( log ", " index )
+Clears the bit at the specified
+.I index
+to 0. Dynamically tightens search boundaries and decrements the tracking counts. 
+Bounds are enforced via
+.BR assert (3).
+.TP
+.BI bitlog_pop_lowest( log )
+Finds, clears, and returns the absolute bit index of the lowest set bit in the log. 
+Optimized using the hardware instruction
+.BR __builtin_ctzll (3).
+Returns -1 if the log is empty.
+.TP
+.BI bitlog_pop_highest( log )
+Finds, clears, and returns the absolute bit index of the highest set bit in the log. 
+Optimized using the hardware instruction
+.BR __builtin_clzll (3).
+Returns -1 if the log is empty.
+.TP
+.BI bitlog_get_used_count( log )
+Returns the total number of bits currently set in the log in
+.I O(1)
+time.
+.TP
+.BI bitlog_clear_all( log )
+Resets all data words in the backing buffer to 0 and clears all internal cursors 
+and metrics.
+.SH COMPILATION
+The functions are implemented with internal linkage using the
+.B static
+keyword. The library is intended to be included directly within standard C files. 
+For maximum performance, compile with:
+.PP
+.RS
+.B clang -O3 -flto
+.RE
+.PP
+This configuration allows the compiler to inline runtime operations aggressively 
+and optimize away unused functions via Link-Time Optimization.
+.SH CONFORMING TO
+.B C99
+.SH SEE ALSO
+.BR assert (3)
